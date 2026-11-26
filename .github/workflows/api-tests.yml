@@ -1,0 +1,43 @@
+name: API tests
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: '0 6 * * 1' # every Monday: the public API can change without notice
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  newman:
+    name: Postman collection (Newman)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Regression checks (must pass)
+        run: npm run test:api
+
+      # These tests fail on purpose: each failure is a documented defect in docs/BUG-REPORTS.md.
+      # The step never fails the build, but its report is kept.
+      - name: Known defects (failures expected)
+        if: always()
+        run: npm run test:defects
+
+      - name: Upload the HTML reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: newman-reports
+          path: reports/
+          retention-days: 30
